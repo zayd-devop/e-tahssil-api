@@ -1,8 +1,11 @@
 <?php
 
-use App\Http\Controllers\FraisStatController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\ProcedureController;
+use App\Http\Controllers\FraisStatController;
+
+
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -18,3 +21,8 @@ Route::apiResource('outstanding-debts', App\Http\Controllers\OutstandingDebtCont
 // Routes pour  تصفية الصوائر
 Route::post('/frais-stats', [FraisStatController::class, 'store']);
 Route::get('/frais-stats', [FraisStatController::class, 'index']);
+//Procedures Routes
+Route::get('/procedures', [ProcedureController::class, 'index']);
+Route::put('/procedures/{id}', [ProcedureController::class, 'update']);
+Route::post('/procedures/import', [ProcedureController::class, 'import']);
+Route::get('/procedures/{id}/print', [ProcedureController::class, 'print']);
