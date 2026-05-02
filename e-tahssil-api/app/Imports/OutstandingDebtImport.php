@@ -5,93 +5,125 @@ namespace App\Imports;
 use App\Models\OutstandingDebt;
 use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithStartRow;
-use Maatwebsite\Excel\Concerns\WithUpserts; // 👈 Import obligatoire pour gérer les doublons
+use Maatwebsite\Excel\Concerns\WithUpserts;
+use Maatwebsite\Excel\Concerns\WithChunkReading;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Events\BeforeSheet;
 
-class OutstandingDebtImport implements ToModel, WithStartRow, WithUpserts
+class OutstandingDebtImport implements ToModel, WithStartRow, WithUpserts, WithChunkReading, WithEvents
 {
-    /**
-     * Le vrai tableau de données commence à la ligne 10.
-     */
-    public function startRow(): int
+    private $currentSheetYear = '';
+
+    public function startRow(): int { return 3; }
+    public function uniqueBy() { return 'collectionFileNumber'; }
+    public function chunkSize(): int { return 1000; }
+
+    public function registerEvents(): array
     {
-        return 10;
+        return [
+            BeforeSheet::class => function(BeforeSheet $event) {
+                $sheetTitle = $event->getSheet()->getTitle();
+                $this->currentSheetYear = preg_match('/\d{4}/', $sheetTitle, $matches) ? $matches[0] : $sheetTitle;
+            }
+        ];
     }
 
-    /**
-     * C'est ici qu'on dit à Laravel : "Si tu vois ce numéro de dossier
-     * exister déjà dans la base, mets-le à jour au lieu de planter".
-     */
-    public function uniqueBy()
-    {
-        return 'collectionFileNumber';
+    private function cleanJudicialID($value) {
+        if (empty($value)) return null;
+        $cleaned = preg_replace('/[A-ZBSUM()=$]/i', '', (string)$value);
+        return trim($cleaned, " \t\n\r\0\x0B=+");
     }
 
-    /**
-     * @param array $row
-     * @return \Illuminate\Database\Eloquent\Model|null
-     */
+    private function hasArabic($str) {
+        return preg_match('/\p{Arabic}/u', (string)$str);
+    }
+
     public function model(array $row)
     {
-        // On ignore les lignes où le numéro de dossier est vide
-        if (empty($row[1])) {
+        // 1. 🧠 DÉTECTION INFAILLIBLE : On cherche la colonne du Nom
+        $isInversed = false;
+
+        $nameInCol8 = $this->hasArabic($row[8] ?? ''); // Index 8 = Colonne I (Format Inversé)
+        $nameInCol4 = $this->hasArabic($row[4] ?? ''); // Index 4 = Colonne E (Format Standard)
+
+        if ($nameInCol8 && !$nameInCol4) {
+            $isInversed = true;
+        } elseif ($nameInCol4 && !$nameInCol8) {
+            $isInversed = false;
+        } else {
+            // Sécurité extrême : si le nom est manquant, on regarde la colonne A
+            $firstCol = trim((string)($row[0] ?? ''));
+            // Dans le standard, A est le N° d'ordre (jamais vide). Donc si c'est vide, c'est Inversé.
+            if (empty($firstCol) || !is_numeric($firstCol)) {
+                $isInversed = true;
+            } else {
+                $isInversed = false;
+            }
+        }
+
+        // 2. MAPPING DYNAMIQUE SÉCURISÉ
+        if ($isInversed) {
+            // FORMAT INVERSÉ (Notes à Gauche : A -> M)
+            $idxNotes    = 0;  $idxProcDate = 1;  $idxLastProc = 2;  $idxExpenses = 3;
+            $idxMonConv  = 4;  $idxFines    = 5;  $idxAssumpDate = 6; $idxAssumpNum = 7;
+            $idxFullName = 8;  $idxJudgDate = 9;  $idxJudgNum  = 10; $idxFileNum  = 11;
+        } else {
+            // FORMAT STANDARD (Ordre à Gauche : A -> M)
+            $idxFileNum  = 1;  $idxJudgNum  = 2;  $idxJudgDate = 3;  $idxFullName = 4;
+            $idxAssumpNum = 5; $idxAssumpDate = 6; $idxFines    = 7;  $idxMonConv  = 8;
+            $idxExpenses = 9;  $idxLastProc = 10; $idxProcDate = 11; $idxNotes    = 12;
+        }
+
+        $rawFileNum = $this->cleanJudicialID($row[$idxFileNum] ?? null);
+        $processedFileNum = $this->transformCalculation($rawFileNum);
+
+        // On ignore les lignes vides ou les totaux
+        if (empty($processedFileNum) || str_contains((string)($row[$idxFullName] ?? ''), 'المجموع')) {
             return null;
         }
 
         return new OutstandingDebt([
-            'collectionFileNumber' => $row[1],
-            'judgmentNumber'       => $row[2],
-            'judgmentDate'         => $this->transformDate($row[3]),
-            'fullName'             => $row[4],
-            'assumptionsNumber'    => $row[5],
-            'assumptionsDate'      => $this->transformDate($row[6]),
-
-            // On nettoie l'argent pour éviter les erreurs de type DECIMAL
-            'fines'                => $this->transformDecimal($row[7]),
-            'monetaryConvictions'  => $this->transformDecimal($row[8]),
-            'expenses'             => $this->transformDecimal($row[9]),
-
-            'lastProcedure'        => $row[10],
-            'procedureDate'        => $this->transformDate($row[11]),
-            'notes'                => $row[12] ?? null,
+            'collectionFileNumber' => (string)$processedFileNum,
+            'judgmentNumber'       => $this->cleanJudicialID($row[$idxJudgNum] ?? null),
+            'judgmentDate'         => $this->transformDate($row[$idxJudgDate] ?? null),
+            'fullName'             => empty(trim((string)($row[$idxFullName] ?? ''))) ? 'غير معروف' : trim((string)($row[$idxFullName])),
+            'assumptionsNumber'    => $this->cleanJudicialID($row[$idxAssumpNum] ?? null),
+            'assumptionsDate'      => $this->transformDate($row[$idxAssumpDate] ?? null),
+            'fines'                => $this->transformDecimal($row[$idxFines] ?? null),
+            'monetaryConvictions'  => $this->transformDecimal($row[$idxMonConv] ?? null),
+            'expenses'             => $this->transformDecimal($row[$idxExpenses] ?? null),
+            'lastProcedure'        => $row[$idxLastProc] ?? null,
+            'procedureDate'        => $this->transformDate($row[$idxProcDate] ?? null),
+            'notes'                => $row[$idxNotes] ?? null,
+            'file_year'            => $this->currentSheetYear,
         ]);
     }
 
-    /**
-     * Fonction magique pour nettoyer l'argent (DECIMAL)
-     */
-    private function transformDecimal($value)
-    {
-        // 1. On enlève les espaces autour
-        $cleanValue = trim($value);
-
-        // 2. Si c'est vide, un tiret, ou si ce n'est pas un nombre, on retourne 0
-        if ($cleanValue === '' || $cleanValue === '-' || !is_numeric($cleanValue)) {
-            return 0;
+    private function transformCalculation($value) {
+        if (is_string($value) && str_contains($value, '+')) {
+            $parts = explode('+', $value);
+            return array_sum(array_map('floatval', $parts));
         }
-
-        // 3. Sinon, on retourne le vrai nombre
-        return (float) $cleanValue;
+        return $value;
     }
 
-    /**
-     * Fonction magique pour gérer les dates Excel bizarres et le texte libre
-     */
-    private function transformDate($value)
-    {
-        if (empty($value)) {
-            return null;
+    private function transformDecimal($value) {
+        if (empty($value) || $value === '-') return 0;
+        $clean = preg_replace('/[^0-9.+]/', '', (string)$value);
+        if (str_contains($clean, '+')) {
+            return array_sum(array_map('floatval', explode('+', $clean)));
         }
+        return is_numeric($clean) ? (float)$clean : 0;
+    }
 
-        // Si c'est un numéro (format date caché d'Excel, ex: 41258)
+    private function transformDate($value) {
+        if (empty($value) || $value === '-') return null;
         if (is_numeric($value)) {
+            if ($value < 3000) return (string)$value;
             try {
                 return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($value)->format('Y-m-d');
-            } catch (\Exception $e) {
-                return (string) $value; // En cas de problème de conversion, on le garde en texte
-            }
+            } catch (\Exception $e) { return (string)$value; }
         }
-
-        // Si c'est du texte libre (ex: "11/242" ou "02/2010"), on le garde tel quel
-        return (string) $value;
+        return (string)$value;
     }
 }

@@ -12,6 +12,7 @@ return new class extends Migration
             $table->id();
 
             $table->string('collectionFileNumber')->unique();
+
             $table->string('fullName');
 
             $table->string('judgmentNumber')->nullable();
@@ -27,6 +28,7 @@ return new class extends Migration
             $table->string('lastProcedure')->nullable();
             $table->string('procedureDate')->nullable();
             $table->text('notes')->nullable();
+            $table->string('file_year')->nullable();
 
             $table->timestamps();
         });

@@ -22,6 +22,7 @@ class OutstandingDebt extends Model
         'expenses',
         'lastProcedure',
         'procedureDate',
-        'notes'
+        'notes',
+        'file_year',
     ];
 }
