@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Folder;
 use PhpOffice\PhpWord\TemplateProcessor;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
 
 class DocumentController extends Controller
 {
@@ -27,7 +28,7 @@ class DocumentController extends Controller
                 'debtor_cin' => $request->debtorCIN ?? null,
                 'debt_amount' => $request->debtAmount ?? 0,
                 'debtor_address' => $request->debtorAddress ?? null,
-                'user_id' => 1, // Temporaire (on mettra l'ID de l'utilisateur connecté plus tard)
+                'user_id' => Auth::id(), // Temporaire (on mettra l'ID de l'utilisateur connecté plus tard)
             ]
         );
 
@@ -41,11 +42,19 @@ class DocumentController extends Controller
 
         // 4. Ouvrir le modèle avec PHPWord
         $templateProcessor = new TemplateProcessor($templatePath);
-
-        // 👇 Ajout spécial pour la signature et la date
-        // Plus tard, on utilisera : auth()->user()->name
-        $templateProcessor->setValue('user_name', 'عدنان شقور');
-        $templateProcessor->setValue('user_id', '1234'); // L'ID de l'employé
+        
+        $user = Auth::user();
+        if ($user->clerk) {
+            // S'il a un profil Clerk, on prend le nom depuis la table clerks
+            $nomAafficher = $user->clerk->nom . ' ' . $user->clerk->prenom;
+        } elseif ($user->admin) {
+            // S'il a un profil Admin (au cas où un admin génère un document)
+            $nomAafficher = $user->admin->nom . ' ' . $user->admin->prenom;
+        } else {
+            // Par défaut, s'il n'a ni l'un ni l'autre
+            $nomAafficher = $user->name ?? 'مستخدم غير معروف';
+        }
+        $templateProcessor->setValue('user_name', $nomAafficher);
         $templateProcessor->setValue('current_date', date('Y/m/d')); // La date du jour automatique
 
         // 5. Injecter TOUTES les variables envoyées par React
