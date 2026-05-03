@@ -58,7 +58,10 @@ class DocumentController extends Controller
         }
 
         // 6. Préparer le fichier de sortie temporaire
-        $fileName = 'document_' . $folder->dossier_num . '_' . time() . '.docx';
+       // 6. Préparer le fichier de sortie temporaire
+        $safeDossierNum = str_replace('/', '-', $request->dossierNum); // Transforme 125/2026 en 125-2026
+        $fileName = 'document_' . $safeDossierNum . '_' . time() . '.docx';
+
         // On s'assure que le dossier temp existe
         if (!file_exists(storage_path('app/temp'))) {
             mkdir(storage_path('app/temp'), 0755, true);
@@ -70,5 +73,16 @@ class DocumentController extends Controller
 
         // 7. Renvoyer le fichier au navigateur pour téléchargement et le supprimer du serveur
         return response()->download($tempPath, $request->activeDoc . '.docx')->deleteFileAfterSend(true);
+    }
+
+
+    // Récupérer l'historique des dossiers
+    public function getFolders()
+    {
+        // On récupère tous les dossiers, du plus récent au plus ancien
+        $folders = Folder::orderBy('created_at', 'desc')->paginate(10);
+
+        // On les renvoie au format JSON
+        return response()->json($folders);
     }
 }

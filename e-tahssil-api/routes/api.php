@@ -31,5 +31,5 @@ Route::post('/procedures/import', [ProcedureController::class, 'import']);
 Route::get('/procedures/{id}/print', [ProcedureController::class, 'print']);
 
 // Route pour la génération de documents توليد الوثائق
-// Route pour générer le document
 Route::post('/generate-document', [DocumentController::class, 'generate']);
+Route::get('/folders', [DocumentController::class, 'getFolders']);
