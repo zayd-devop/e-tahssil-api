@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\ProcedureController;
+use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\FraisStatController;
 
 
@@ -21,8 +22,14 @@ Route::apiResource('outstanding-debts', App\Http\Controllers\OutstandingDebtCont
 // Routes pour  تصفية الصوائر
 Route::post('/frais-stats', [FraisStatController::class, 'store']);
 Route::get('/frais-stats', [FraisStatController::class, 'index']);
-//Procedures Routes
+
+
+// Routes pour اجراء يوجه
 Route::get('/procedures', [ProcedureController::class, 'index']);
 Route::put('/procedures/{id}', [ProcedureController::class, 'update']);
 Route::post('/procedures/import', [ProcedureController::class, 'import']);
 Route::get('/procedures/{id}/print', [ProcedureController::class, 'print']);
+
+// Route pour la génération de documents توليد الوثائق
+// Route pour générer le document
+Route::post('/generate-document', [DocumentController::class, 'generate']);
