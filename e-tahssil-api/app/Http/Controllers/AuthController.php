@@ -19,9 +19,7 @@ class AuthController extends Controller
         ]);
 
         // 2. التحقق من وجود المستخدم وصحة كلمة المرور
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user || !Hash::check($request->password, $user->password)) {
+$user = User::with(['clerk', 'admin'])->where('email', $request->identifier ?? $request->email)->first();        if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
                 'message' => 'البريد الإلكتروني أو كلمة المرور غير صحيحة'
             ], 401);

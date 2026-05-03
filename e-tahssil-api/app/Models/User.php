@@ -25,10 +25,10 @@ class User extends Authenticatable
 
     public function admin()
     {
-        return $this->hasOne(Admin::class);
+        return $this->hasOne(Admin::class,'user_id');
     }
     public function clerk()
     {
-        return $this->hasOne(Clerk::class);
+        return $this->hasOne(Clerk::class,'user_id');
     }
 }
