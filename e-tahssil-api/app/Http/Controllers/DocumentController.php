@@ -20,7 +20,6 @@ class DocumentController extends Controller
         ]);
 
         // 2. Sauvegarder ou mettre à jour le dossier dans la base de données
-        // On utilise updateOrCreate pour mettre à jour si le dossier existe déjà, ou le créer sinon
         $folder = Folder::updateOrCreate(
             ['dossier_num' => $request->dossierNum], // On cherche par numéro de dossier
             [
@@ -28,12 +27,11 @@ class DocumentController extends Controller
                 'debtor_cin' => $request->debtorCIN ?? null,
                 'debt_amount' => $request->debtAmount ?? 0,
                 'debtor_address' => $request->debtorAddress ?? null,
-                'user_id' => Auth::id(), // Temporaire (on mettra l'ID de l'utilisateur connecté plus tard)
+                'user_id' => Auth::id(),
             ]
         );
 
         // 3. Vérifier que le modèle Word existe
-        // Les modèles doivent être placés dans le dossier: storage/app/templates/
         $templatePath = storage_path('app/templates/' . $request->activeDoc . '.docx');
 
         if (!file_exists($templatePath)) {
@@ -42,32 +40,108 @@ class DocumentController extends Controller
 
         // 4. Ouvrir le modèle avec PHPWord
         $templateProcessor = new TemplateProcessor($templatePath);
-        
+
         $user = Auth::user();
         if ($user->clerk) {
-            // S'il a un profil Clerk, on prend le nom depuis la table clerks
             $nomAafficher = $user->clerk->nom . ' ' . $user->clerk->prenom;
         } elseif ($user->admin) {
-            // S'il a un profil Admin (au cas où un admin génère un document)
             $nomAafficher = $user->admin->nom . ' ' . $user->admin->prenom;
         } else {
-            // Par défaut, s'il n'a ni l'un ni l'autre
             $nomAafficher = $user->name ?? 'مستخدم غير معروف';
         }
         $templateProcessor->setValue('user_name', $nomAafficher);
-        $templateProcessor->setValue('current_date', date('Y/m/d')); // La date du jour automatique
+        $templateProcessor->setValue('current_date', date('Y/m/d'));
 
+        // ====================================================================
+        // 👇 NOUVELLE LOGIQUE POUR LE TABLEAU DES COMPTES BANCAIRES (ATD) 👇
+        // ====================================================================
+        if ($request->filled('debtor_bank_accounts')) {
+            $comptesBruts = $request->debtor_bank_accounts;
+
+            // On découpe le texte à chaque saut de ligne (Entrée)
+            $lignes = explode("\n", str_replace("\r", "", $comptesBruts));
+
+            // On prépare le tableau au format exigé par PHPWord
+            $comptesPourWord = [];
+            foreach ($lignes as $ligne) {
+                $compte = trim($ligne); // Enlève les espaces inutiles
+                if (!empty($compte)) {
+                    $comptesPourWord[] = ['account_number' => $compte];
+                }
+            }
+
+            // On injecte dans le tableau Word
+            if (count($comptesPourWord) > 0) {
+                // S'il y a des comptes, on clone la ligne
+                $templateProcessor->cloneRowAndSetValues('account_number', $comptesPourWord);
+            } else {
+                // S'il est vide mais que le champ était là, on met un tiret
+                $templateProcessor->cloneRowAndSetValues('account_number', [['account_number' => '---']]);
+            }
+        }
+        // ====================================================================
+        // 👆 FIN DE LA NOUVELLE LOGIQUE 👆
+        // ====================================================================
+        // ====================================================================
+        // 👇 LOGIQUE POUR LA LISTE DES DOCUMENTS (حق الاطلاع) 👇
+        // ====================================================================
+        if ($request->filled('requested_info')) {
+            $lignes = explode("\n", str_replace("\r", "", $request->requested_info));
+            $infosPourWord = [];
+
+            // On nettoie chaque ligne tapée par l'utilisateur
+            foreach ($lignes as $ligne) {
+                $texte = trim($ligne);
+                if (!empty($texte)) {
+                    $infosPourWord[] = ['requested_info' => $texte];
+                }
+            }
+
+            // On clone le bloc Word autant de fois qu'il y a de lignes
+            if (count($infosPourWord) > 0) {
+                $templateProcessor->cloneBlock('block_req', 0, true, false, $infosPourWord);
+            } else {
+                // Si l'utilisateur n'a rien saisi, on met un tiret vide
+                $templateProcessor->cloneBlock('block_req', 0, true, false, [['requested_info' => '---']]);
+            }
+
+            // On supprime la variable de la requête pour ne pas que la boucle générale (Etape 5)
+            // essaie de la remplacer à nouveau
+            $request->request->remove('requested_info');
+        }
+        // ====================================================================
         // 5. Injecter TOUTES les variables envoyées par React
-        // On boucle sur tout ce que React a envoyé (Données générales + spécifiques)
-        foreach ($request->all() as $key => $value) {
+
+        $dataToInject = $request->all();
+
+        // Petit formatage juste pour que la date du وصل soit belle (JJ/MM/AAAA)
+        if (!empty($dataToInject['receipt_date'])) {
+            $dataToInject['receipt_date'] = date('d/m/Y', strtotime($dataToInject['receipt_date']));
+        }
+
+        // On boucle sur nos données pour les injecter dans Word
+        foreach ($dataToInject as $key => $value) {
             if (is_string($value) || is_numeric($value)) {
-                // Remplace {ma_cle} par sa valeur dans le Word
+                $templateProcessor->setValue($key, $value);
+            }
+            if (!empty($dataToInject['receipt_date'])) {
+            $dataToInject['receipt_date'] = date('d/m/Y', strtotime($dataToInject['receipt_date']));
+        }
+
+        // 👇 Ajoute cette ligne pour la nouvelle date de notification
+        if (!empty($dataToInject['notification_date'])) {
+            $dataToInject['notification_date'] = date('d/m/Y', strtotime($dataToInject['notification_date']));
+        }
+        }
+
+        // Maintenant on boucle sur nos données modifiées pour les injecter dans Word
+        foreach ($dataToInject as $key => $value) {
+            if (is_string($value) || is_numeric($value)) {
                 $templateProcessor->setValue($key, $value);
             }
         }
 
         // 6. Préparer le fichier de sortie temporaire
-       // 6. Préparer le fichier de sortie temporaire
         $safeDossierNum = str_replace('/', '-', $request->dossierNum); // Transforme 125/2026 en 125-2026
         $fileName = 'document_' . $safeDossierNum . '_' . time() . '.docx';
 
