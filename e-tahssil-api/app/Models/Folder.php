@@ -8,13 +8,14 @@ class Folder extends Model
 {
     // Les champs que Laravel a le droit de remplir automatiquement
     protected $fillable = [
-        'dossier_num',
-        'debtor_name',
-        'debtor_cin',
-        'debt_amount',
-        'debtor_address',
-        'user_id'
-    ];
+    'dossier_num',
+    'debtor_name',
+    'debtor_cin',
+    'debtor_address',
+    'debt_amount',
+    'user_id',
+    'document_type', // 👈 À AJOUTER ICI
+];
 
     // Relation avec l'utilisateur (le greffier)
     public function user()

@@ -12,11 +12,13 @@ return new class extends Migration
             $table->id();
 
             // --- Informations Générales (React) ---
-            $table->string('dossier_num')->unique();       // رقم الملف
+            $table->string('dossier_num');       // رقم الملف
             $table->string('debtor_name');                 // الاسم الكامل للمدين
             $table->string('debtor_cin')->nullable();      // رقم البطاقة الوطنية
-            $table->decimal('debt_amount', 15, 2);         // المبلغ المستحق
-            $table->text('debtor_address')->nullable();    // عنوان المدين
+            $table->decimal('debt_amount', 15, 2);
+            $table->string('document_type')->nullable();      // المبلغ المستحق
+            $table->text('debtor_address')->nullable();
+               // عنوان المدين
 
             // --- Traçabilité ---
             // L'ID du greffier (user) qui a créé le dossier
