@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\ProcedureController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\FraisStatController;
 
 
@@ -28,4 +29,7 @@ Route::get('/procedures', [ProcedureController::class, 'index']);
 Route::put('/procedures/{id}', [ProcedureController::class, 'update']);
 Route::post('/procedures/import', [ProcedureController::class, 'import']);
 Route::get('/procedures/{id}/print', [ProcedureController::class, 'print']);
+Route::post('/generate-dispatch', [DocumentController::class, 'generateDispatchDocument']);
+Route::get('/correspondences/archive', [DocumentController::class, 'getArchive']);
+Route::get('/user/letters-count', [DocumentController::class, 'getUserLettersCount']);
 });
