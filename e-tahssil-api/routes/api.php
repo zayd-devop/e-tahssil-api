@@ -24,7 +24,9 @@ Route::apiResource('outstanding-debts', App\Http\Controllers\OutstandingDebtCont
 // Routes pour  تصفية الصوائر
 Route::post('/frais-stats', [FraisStatController::class, 'store']);
 Route::get('/frais-stats', [FraisStatController::class, 'index']);
-//Procedures Routes
+
+
+// Routes pour اجراء يوجه
 Route::get('/procedures', [ProcedureController::class, 'index']);
 Route::put('/procedures/{id}', [ProcedureController::class, 'update']);
 Route::post('/procedures/import', [ProcedureController::class, 'import']);
@@ -32,4 +34,7 @@ Route::get('/procedures/{id}/print', [ProcedureController::class, 'print']);
 Route::post('/generate-dispatch', [DocumentController::class, 'generateDispatchDocument']);
 Route::get('/correspondences/archive', [DocumentController::class, 'getArchive']);
 Route::get('/user/letters-count', [DocumentController::class, 'getUserLettersCount']);
+
+Route::post('/generate-document', [DocumentController::class, 'generate']);
+Route::get('/folders', [DocumentController::class, 'getFolders']);
 });
