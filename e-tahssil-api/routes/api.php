@@ -25,7 +25,6 @@ Route::apiResource('outstanding-debts', App\Http\Controllers\OutstandingDebtCont
 Route::post('/frais-stats', [FraisStatController::class, 'store']);
 Route::get('/frais-stats', [FraisStatController::class, 'index']);
 
-
 // Routes pour اجراء يوجه
 Route::get('/procedures', [ProcedureController::class, 'index']);
 Route::put('/procedures/{id}', [ProcedureController::class, 'update']);
@@ -34,7 +33,6 @@ Route::get('/procedures/{id}/print', [ProcedureController::class, 'print']);
 Route::post('/generate-dispatch', [DocumentController::class, 'generateDispatchDocument']);
 Route::get('/correspondences/archive', [DocumentController::class, 'getArchive']);
 Route::get('/user/letters-count', [DocumentController::class, 'getUserLettersCount']);
-
 Route::post('/generate-document', [DocumentController::class, 'generate']);
 Route::get('/folders', [DocumentController::class, 'getFolders']);
 });

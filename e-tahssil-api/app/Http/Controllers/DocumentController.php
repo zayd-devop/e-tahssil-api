@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Correspondence;
 use App\Models\Folder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use PhpOffice\PhpWord\TemplateProcessor;
 use Illuminate\Support\Facades\Storage;
 
@@ -211,7 +210,7 @@ class DocumentController extends Controller
             'debtor_cin' => $request->debtorCIN ?? null,
             'debt_amount' => $request->debtAmount ?? 0,
             'debtor_address' => $request->debtorAddress ?? null,
-            'user_id' => Auth::id(),
+            'user_id' => $request->user()->id,
             'document_type' => $request->activeDoc,
         ]);
 
@@ -225,7 +224,7 @@ class DocumentController extends Controller
         // 4. Ouvrir le modèle avec PHPWord
         $templateProcessor = new TemplateProcessor($templatePath);
 
-        $user = Auth::user();
+        $user = $request->user();
         if ($user->clerk) {
             $nomAafficher = $user->clerk->nom . ' ' . $user->clerk->prenom;
         } elseif ($user->admin) {
