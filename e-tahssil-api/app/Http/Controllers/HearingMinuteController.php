@@ -52,7 +52,7 @@ class HearingMinuteController extends Controller
             ->whereRaw("TRIM(result) != ?", ['?'])
             ->whereRaw("TRIM(result) != ?", ['؟'])
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->paginate(10);
 
         return response()->json(['data' => $data]);
     }
