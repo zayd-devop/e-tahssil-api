@@ -6,8 +6,7 @@ use App\Http\Controllers\Api\ProcedureController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\FraisStatController;
-
-
+use App\Http\Controllers\HearingMinuteController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -35,4 +34,8 @@ Route::get('/correspondences/archive', [DocumentController::class, 'getArchive']
 Route::get('/user/letters-count', [DocumentController::class, 'getUserLettersCount']);
 Route::post('/generate-document', [DocumentController::class, 'generate']);
 Route::get('/folders', [DocumentController::class, 'getFolders']);
+Route::post('/hearing-minutes/import', [HearingMinuteController::class, 'importExcel']);
+Route::get('/hearing-minutes', [HearingMinuteController::class, 'index']);
+Route::get('/hearing-minutes/print/{id}', [HearingMinuteController::class, 'printSingle']);
+Route::post('/hearing-minutes/print-merged', [HearingMinuteController::class, 'printMerged']);
 });
