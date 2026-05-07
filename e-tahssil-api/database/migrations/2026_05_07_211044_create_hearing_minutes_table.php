@@ -8,7 +8,9 @@ return new class extends Migration {
     public function up(): void {
         Schema::create('hearing_minutes', function (Blueprint $table) {
             $table->id();
-            $table->string('file_number')->nullable();      // الرقم الكامل للملف
+            $table->string('file_number')->nullable();
+            $table->text('plaintiff')->nullable();        // المدعي
+            $table->text('defendant')->nullable();        // المدعى عليه
             $table->string('judgment_type')->nullable();    // نوع الحكم
             $table->string('judgment_date')->nullable();    // تاريخ الحكم
             $table->string('judgment_number')->nullable();  // رقم الحكم/القرار

@@ -9,9 +9,18 @@ class HearingMinute extends Model {
     use HasFactory;
 
     protected $fillable = [
-        'file_number', 'judgment_type', 'judgment_date', 'judgment_number',
-        'ordinal_number', 'decision_content', 'judge', 'subject',
-        'result_color', 'user_id'
+        'file_number',
+        'plaintiff',       // 👈 Ajouté
+        'defendant',
+        'judgment_type',
+        'judgment_date',
+        'judgment_number',
+        'ordinal_number',
+        'decision_content',
+        'judge',
+        'subject',
+        'result_color',
+        'user_id'
     ];
 
     public function user() {

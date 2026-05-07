@@ -38,4 +38,5 @@ Route::post('/hearing-minutes/import', [HearingMinuteController::class, 'importE
 Route::get('/hearing-minutes', [HearingMinuteController::class, 'index']);
 Route::get('/hearing-minutes/print/{id}', [HearingMinuteController::class, 'printSingle']);
 Route::post('/hearing-minutes/print-merged', [HearingMinuteController::class, 'printMerged']);
+Route::post('/general-register/import', [HearingMinuteController::class, 'importGeneralRegister']);
 });
