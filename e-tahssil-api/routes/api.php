@@ -6,8 +6,7 @@ use App\Http\Controllers\Api\ProcedureController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\FraisStatController;
-
-
+use App\Http\Controllers\HearingMinuteController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -25,13 +24,16 @@ Route::apiResource('outstanding-debts', App\Http\Controllers\OutstandingDebtCont
 Route::post('/frais-stats', [FraisStatController::class, 'store']);
 Route::get('/frais-stats', [FraisStatController::class, 'index']);
 
-
 // Routes pour اجراء يوجه
 Route::get('/procedures', [ProcedureController::class, 'index']);
 Route::put('/procedures/{id}', [ProcedureController::class, 'update']);
 Route::post('/procedures/import', [ProcedureController::class, 'import']);
 Route::get('/procedures/{id}/print', [ProcedureController::class, 'print']);
-
+Route::post('/generate-dispatch', [DocumentController::class, 'generateDispatchDocument']);
+Route::get('/correspondences/archive', [DocumentController::class, 'getArchive']);
+Route::get('/user/letters-count', [DocumentController::class, 'getUserLettersCount']);
 Route::post('/generate-document', [DocumentController::class, 'generate']);
 Route::get('/folders', [DocumentController::class, 'getFolders']);
+Route::get('/hearing-minutes', [HearingMinuteController::class, 'index']);
+Route::post('/hearing-minutes/import', [HearingMinuteController::class, 'import']);
 });
