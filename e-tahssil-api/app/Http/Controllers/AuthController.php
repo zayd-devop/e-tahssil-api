@@ -6,49 +6,53 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    // دالة تسجيل الدخول
+    // Méthode de connexion (Login)
     public function login(Request $request)
     {
-        // 1. التحقق من صحة البيانات المدخلة
+        // 1. Validation des données
         $request->validate([
             'email' => 'required|email',
             'password' => 'required'
         ]);
 
-        // 2. التحقق من وجود المستخدم وصحة كلمة المرور
-$user = User::with(['clerk', 'admin'])->where('email', $request->identifier ?? $request->email)->first();        if (!$user || !Hash::check($request->password, $user->password)) {
+        // 2. Recherche de l'utilisateur uniquement par son email
+        $user = User::where('email', $request->email)->first();
+
+        // 3. Vérification des identifiants
+        if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
-                'message' => 'البريد الإلكتروني أو كلمة المرور غير صحيحة'
+                'message' => 'Identifiants incorrects.'
             ], 401);
         }
 
-        // 3. إنشاء التوكن (Token)
+        // 4. Création du Token (Sanctum)
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        // 4. إرجاع النتيجة
+        // 5. Réponse
         return response()->json([
-            'message' => 'تم تسجيل الدخول بنجاح',
+            'message' => 'Connexion réussie',
             'access_token' => $token,
             'token_type' => 'Bearer',
-            'user' => $user
+            'user' => $user // Retourne l'utilisateur simple sans relations admin/clerk
         ]);
     }
 
-    // دالة تسجيل الخروج
+    // Méthode de déconnexion (Logout)
     public function logout(Request $request)
     {
-        // حذف التوكن الحالي
+        // Supprime le token actuel
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([
-            'message' => 'تم تسجيل الخروج بنجاح'
+            'message' => 'Déconnexion réussie'
         ]);
     }
 
-    // دالة لجلب بيانات المستخدم الحالي (تستخدم للتأكد من حالة الدخول في React)
+    // Récupérer l'utilisateur authentifié
     public function user(Request $request)
     {
         return response()->json($request->user());
