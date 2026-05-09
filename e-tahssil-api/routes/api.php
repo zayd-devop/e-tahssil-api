@@ -7,31 +7,44 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\FraisStatController;
 
+// -----------------------------------------------------
+// ROUTES PUBLIQUES (Non protégées - Accès libre)
+// -----------------------------------------------------
 
-
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
-
-//Login Route
+// Login : L'utilisateur vient chercher son Token
 Route::post('/login', [AuthController::class, 'login']);
+
+
+// -----------------------------------------------------
+// ROUTES PROTÉGÉES (Nécessitent un Token valide)
+// -----------------------------------------------------
 Route::middleware('auth:sanctum')->group(function () {
-// Routes pour الباقي بدون تحصيل
-// 1. Toujours mettre les routes spécifiques EN PREMIER
-Route::post('outstanding-debts/import', [App\Http\Controllers\OutstandingDebtController::class, 'import']);
-// 2. Mettre la route Ressource (qui contient les paramètres dynamiques comme {id}) EN DERNIER
-Route::apiResource('outstanding-debts', App\Http\Controllers\OutstandingDebtController::class);
-// Routes pour  تصفية الصوائر
-Route::post('/frais-stats', [FraisStatController::class, 'store']);
-Route::get('/frais-stats', [FraisStatController::class, 'index']);
 
+    // Obtenir l'utilisateur actuel
+    Route::get('/user', function (Request $request) {
+        return $request->user();
+    });
 
-// Routes pour اجراء يوجه
-Route::get('/procedures', [ProcedureController::class, 'index']);
-Route::put('/procedures/{id}', [ProcedureController::class, 'update']);
-Route::post('/procedures/import', [ProcedureController::class, 'import']);
-Route::get('/procedures/{id}/print', [ProcedureController::class, 'print']);
+    // 🔥 Logout : L'utilisateur est reconnu, on peut détruire son Token
+    Route::post('/logout', [AuthController::class, 'logout']);
 
-Route::post('/generate-document', [DocumentController::class, 'generate']);
-Route::get('/folders', [DocumentController::class, 'getFolders']);
+    // --- Routes pour الباقي بدون تحصيل ---
+    // 1. Toujours mettre les routes spécifiques EN PREMIER
+    Route::post('outstanding-debts/import', [App\Http\Controllers\OutstandingDebtController::class, 'import']);
+    // 2. Mettre la route Ressource (qui contient les paramètres dynamiques comme {id}) EN DERNIER
+    Route::apiResource('outstanding-debts', App\Http\Controllers\OutstandingDebtController::class);
+
+    // --- Routes pour  تصفية الصوائر ---
+    Route::post('/frais-stats', [FraisStatController::class, 'store']);
+    Route::get('/frais-stats', [FraisStatController::class, 'index']);
+
+    // --- Routes pour اجراء يوجه ---
+    Route::get('/procedures', [ProcedureController::class, 'index']);
+    Route::put('/procedures/{id}', [ProcedureController::class, 'update']);
+    Route::post('/procedures/import', [ProcedureController::class, 'import']);
+    Route::get('/procedures/{id}/print', [ProcedureController::class, 'print']);
+
+    // --- Routes pour les Documents  توليد الوثائق ---
+    Route::post('/generate-document', [DocumentController::class, 'generate']);
+    Route::get('/folders', [DocumentController::class, 'getFolders']);
 });
