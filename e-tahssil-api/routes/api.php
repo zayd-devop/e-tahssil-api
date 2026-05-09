@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\ProcedureController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\FraisStatController;
+use App\Http\Controllers\UserController;
 
 // -----------------------------------------------------
 // ROUTES PUBLIQUES (Non protégées - Accès libre)
@@ -47,4 +48,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // --- Routes pour les Documents  توليد الوثائق ---
     Route::post('/generate-document', [DocumentController::class, 'generate']);
     Route::get('/folders', [DocumentController::class, 'getFolders']);
+
+    // --- Routes pour gestion des users
+    Route::get('/users', [UserController::class, 'index']); // لجلب الموظفين
+    Route::post('/users/import', [UserController::class, 'import']); // لاستيراد Excel
+    Route::delete('/users/{id}', [UserController::class, 'destroy']); // للحذف
+    Route::post('/users/{id}/reset-password', [UserController::class, 'resetPassword']); // لإعادة تعيين كلمة السر (وإرجاع كلمة السر الجديدة في الرد: ['new_password' => '...'])
+    
 });
