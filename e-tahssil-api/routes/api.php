@@ -7,6 +7,9 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\FraisStatController;
 use App\Http\Controllers\HearingMinuteController;
+use App\Http\Controllers\JudicialAssistanceController;
+use App\Http\Controllers\OutstandingDebtController;
+use App\Http\Controllers\SupplementaryFeeController;
 use App\Http\Controllers\UserController;
 
 Route::get('/user', function (Request $request) {
@@ -32,10 +35,7 @@ Route::get('/correspondences/archive', [DocumentController::class, 'getArchive']
 Route::get('/user/letters-count', [DocumentController::class, 'getUserLettersCount']);
 Route::post('/generate-document', [DocumentController::class, 'generate']);
 Route::get('/folders', [DocumentController::class, 'getFolders']);
-Route::post('/hearing-minutes/import', [HearingMinuteController::class, 'importExcel']);
-Route::get('/hearing-minutes', [HearingMinuteController::class, 'index']);
-Route::get('/hearing-minutes/print/{id}', [HearingMinuteController::class, 'printSingle']);
-Route::post('/hearing-minutes/print-merged', [HearingMinuteController::class, 'printMerged']);
+
     // Obtenir l'utilisateur actuel
     Route::get('/user', function (Request $request) {
         return $request->user();
@@ -46,13 +46,19 @@ Route::post('/hearing-minutes/print-merged', [HearingMinuteController::class, 'p
 
     // --- Routes pour الباقي بدون تحصيل ---
     // 1. Toujours mettre les routes spécifiques EN PREMIER
-    Route::post('outstanding-debts/import', [App\Http\Controllers\OutstandingDebtController::class, 'import']);
+    Route::post('outstanding-debts/import', [OutstandingDebtController::class, 'import']);
     // 2. Mettre la route Ressource (qui contient les paramètres dynamiques comme {id}) EN DERNIER
-    Route::apiResource('outstanding-debts', App\Http\Controllers\OutstandingDebtController::class);
+    Route::apiResource('outstanding-debts', OutstandingDebtController::class);
 
     // --- Routes pour  تصفية الصوائر ---
     Route::post('/frais-stats', [FraisStatController::class, 'store']);
     Route::get('/frais-stats', [FraisStatController::class, 'index']);
+    Route::get('supplementary-fees', [SupplementaryFeeController::class, 'index']);
+    Route::post('supplementary-fees/import', [SupplementaryFeeController::class, 'import']);
+
+
+    Route::get('judicial-assistance', [JudicialAssistanceController::class, 'index']);
+    Route::post('judicial-assistance/import', [JudicialAssistanceController::class, 'import']);
 
     // --- Routes pour اجراء يوجه ---
     Route::get('/procedures', [ProcedureController::class, 'index']);
