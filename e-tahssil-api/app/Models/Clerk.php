@@ -7,10 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 class Clerk extends Model
 {
     protected $fillable = [
+        'user_id',
         'nom',
         'prenom',
         'type_responsabilite',
-        'grade',
+        'grade'
     ];
 
     public function user()

@@ -24,7 +24,8 @@ $user = User::with(['clerk', 'admin'])->where('email', $request->identifier ?? $
                 'message' => 'البريد الإلكتروني أو كلمة المرور غير صحيحة'
             ], 401);
         }
-
+        $user->last_login_at = now();
+        $user->save();
         // 3. إنشاء التوكن (Token)
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -40,8 +41,14 @@ $user = User::with(['clerk', 'admin'])->where('email', $request->identifier ?? $
     // دالة تسجيل الخروج
     public function logout(Request $request)
     {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
         // حذف التوكن الحالي
-        $request->user()->currentAccessToken()->delete();
+        /** @var \Laravel\Sanctum\PersonalAccessToken $token */
+        $token = $user->currentAccessToken();
+
+        // Plus aucune ligne rouge !
+        $token->delete();
 
         return response()->json([
             'message' => 'تم تسجيل الخروج بنجاح'
