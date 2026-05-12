@@ -2,24 +2,20 @@
 
 namespace App\Http\Controllers;
 
-use App\Imports\OutstandingDebtImport;
-use App\Models\OutstandingDebt;
+use App\Imports\SupplementaryFeeImport;
+use App\Models\SupplementaryFee;
 use Illuminate\Http\Request;
+// use App\Imports\SupplementaryFeeImport; // À créer de la même manière que l'autre si tu veux l'import Excel
 use Maatwebsite\Excel\Facades\Excel;
 
-
-
-class OutstandingDebtController extends Controller
+class SupplementaryFeeController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-   public function index(Request $request)
+    public function index(Request $request)
     {
         $year = $request->query('year');
 
         // Remplace 'OutstandingDebt::query()' par 'SupplementaryFee::query()' dans l'autre contrôleur
-        $query = OutstandingDebt::query();
+        $query = SupplementaryFee::query();
 
         $query->when($year, function ($q) use ($year) {
             // 🔥 LE CORRECTIF EST ICI :
@@ -30,21 +26,22 @@ class OutstandingDebtController extends Controller
                          ->orWhere('collectionFileNumber', 'LIKE', '%' . $year . '%');
             });
         });
+        $debts =$query->orderBy('id', 'desc')->take(1500)->get();
 
-         $debts =$query->orderBy('id', 'desc')->take(1500)->get();
+
         return response()->json($debts);
     }
 
-    // Tu pourras remplir la méthode store() plus tard quand tu feras ton bouton "Ajouter"
+    // Garde la même logique pour import() et store() que ton autre contrôleur...
     public function store(Request $request)
     {
         $validatedData = $request->validate([
-            'collectionFileNumber' => 'required|string|unique:outstanding_debts',
+            'collectionFileNumber' => 'required|string|unique:supplementary_fees',
             'fullName' => 'required|string',
             // Ajoute tes autres règles de validation ici plus tard...
         ]);
 
-        $debt = OutstandingDebt::create($validatedData);
+        $debt = SupplementaryFee::create($validatedData);
 
         return response()->json($debt, 201);
     }
@@ -62,7 +59,7 @@ class OutstandingDebtController extends Controller
 
         try {
             // 3. On lance l'importation avec la classe qu'on a créée
-            Excel::import(new OutstandingDebtImport, $request->file('file'));
+            Excel::import(new SupplementaryFeeImport, $request->file('file'));
 
             return response()->json(['message' => 'تم استيراد الملف بنجاح'], 200);
 
