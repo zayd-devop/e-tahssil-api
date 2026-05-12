@@ -12,14 +12,19 @@ RUN apt-get update && apt-get install -y \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) gd pdo_mysql zip
 
+# # Active le module de réécriture d'Apache (indispensable pour les routes Laravel)
+# RUN a2enmod rewrite
+
+# # Modifie la configuration d'Apache pour pointer directement vers le dossier "public"
+# ENV APACHE_DOCUMENT_ROOT /var/www/html/public
+# RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
+# RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
+# Désactiver les MPM conflictuels et s'assurer que prefork est actif
+RUN a2dismod mpm_event mpm_worker || true
+RUN a2enmod mpm_prefork
+
 # Active le module de réécriture d'Apache (indispensable pour les routes Laravel)
 RUN a2enmod rewrite
-
-# Modifie la configuration d'Apache pour pointer directement vers le dossier "public"
-ENV APACHE_DOCUMENT_ROOT /var/www/html/public
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
-RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
-
 # Définit le dossier de travail
 WORKDIR /var/www/html
 
