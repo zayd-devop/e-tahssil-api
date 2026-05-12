@@ -1,8 +1,11 @@
 <?php
 
+use App\Http\Controllers\Api\FinancialFeeController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\ProcedureController;
+use App\Http\Controllers\Api\ProductionCardController;
+use App\Http\Controllers\Api\SectionController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\FraisStatController;
@@ -75,5 +78,13 @@ Route::get('/folders', [DocumentController::class, 'getFolders']);
     Route::post('/users/import', [UserController::class, 'import']); // لاستيراد Excel
     Route::delete('/users/{id}', [UserController::class, 'destroy']); // للحذف
     Route::post('/users/{id}/reset-password', [UserController::class, 'resetPassword']); // لإعادة تعيين كلمة السر (وإرجاع كلمة السر الجديدة في الرد: ['new_password' => '...'])
-
+    Route::post('/production-cards', [ProductionCardController::class, 'store']);
+    Route::get('/sections-hierarchy', [SectionController::class, 'hierarchy']);
+    Route::get('/financial-fees/{type}', [FinancialFeeController::class, 'index']);
+    Route::post('/financial-fees', [FinancialFeeController::class, 'store']);
+    Route::post('/financial-fees/import', [FinancialFeeController::class, 'import']); // استيراد
+    Route::post('/financial-fees/bulk-delete', [FinancialFeeController::class, 'bulkDestroy']); // حذف مجمع
+    Route::put('/financial-fees/{id}', [FinancialFeeController::class, 'update']);
+    Route::delete('/financial-fees/{id}', [FinancialFeeController::class, 'destroy']);
 });
+
