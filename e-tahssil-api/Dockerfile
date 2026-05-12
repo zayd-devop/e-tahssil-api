@@ -36,4 +36,4 @@ RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cac
 # 7. LA SOLUTION FINALE : Le script de démarrage forcé
 # Au lieu de lancer Apache directement, on nettoie les MPM AVANT.
 EXPOSE 80
-CMD ["/bin/sh", "-c", "a2dismod mpm_event mpm_worker || true && a2enmod mpm_prefork rewrite && apache2-foreground"]
+CMD ["/bin/sh", "-c", "php artisan migrate --force && a2dismod mpm_event mpm_worker || true && a2enmod mpm_prefork rewrite && apache2-foreground"]
