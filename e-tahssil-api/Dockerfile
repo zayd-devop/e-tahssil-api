@@ -1,7 +1,7 @@
-# Utilise l'image officielle PHP 8.3 avec Apache (Debian Bookworm)
+# Utilise l'image officielle PHP 8.3 avec Apache
 FROM php:8.3-apache
 
-# 1. Installation des dépendances système nécessaires
+# 1. Installation des dépendances système
 RUN apt-get update && apt-get install -y \
     libfreetype6-dev \
     libjpeg62-turbo-dev \
@@ -14,48 +14,30 @@ RUN apt-get update && apt-get install -y \
     libxml2-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 2. Configuration et installation des extensions PHP (y compris GD pour Excel/Word)
+# 2. Installation des extensions PHP
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) \
-    gd \
-    pdo_mysql \
-    zip \
-    mbstring \
-    exif \
-    pcntl \
-    bcmath \
-    xml
+    && docker-php-ext-install -j$(nproc) gd pdo_mysql zip mbstring exif pcntl bcmath xml
 
-# 3. SOLUTION AU CRASH APACHE : Suppression physique des MPM conflictuels
-# On force Apache à n'utiliser que 'prefork' pour PHP
-RUN rm -f /etc/apache2/mods-enabled/mpm_event.load /etc/apache2/mods-enabled/mpm_event.conf \
-    && rm -f /etc/apache2/mods-enabled/mpm_worker.load /etc/apache2/mods-enabled/mpm_worker.conf \
-    && a2enmod mpm_prefork \
-    && a2enmod rewrite
+# 3. SOLUTION DEFINITIVE AU CRASH MPM : Ecrasement de la config de chargement
+# Cette commande force Apache à ne charger QUE le module prefork, peu importe les autres fichiers présents.
+RUN printf "LoadModule mpm_prefork_module /usr/lib/apache2/modules/mod_mpm_prefork.so\n" > /etc/apache2/mods-available/mpm_prefork.load \
+    && a2dismod mpm_event mpm_worker || true \
+    && a2enmod mpm_prefork rewrite
 
-# 4. Configuration du dossier racine d'Apache pour pointer vers /public de Laravel
+# 4. Configuration du dossier racine /public
 ENV APACHE_DOCUMENT_ROOT /var/www/html/public
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
 RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
 
 # 5. Préparation de l'application
 WORKDIR /var/www/html
-
-# Récupération de Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-# Copie de tout le code du projet
 COPY . /var/www/html/
-
-# Installation des dépendances PHP (via composer.lock pour garantir la version 8.3)
 RUN composer install --no-dev --optimize-autoloader
 
-# 6. Gestion des permissions (Crucial pour Laravel)
+# 6. Permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Exposition du port par défaut
 EXPOSE 80
-
-# Commande de lancement
 CMD ["apache2-foreground"]
