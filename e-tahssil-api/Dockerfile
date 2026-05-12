@@ -1,6 +1,7 @@
-# Utilise une image officielle PHP optimisée avec le serveur Apache
+# Utilise l'image officielle PHP 8.3 avec Apache (Debian Bookworm)
 FROM php:8.3-apache
-# Installe les librairies système requises pour Laravel et GD
+
+# 1. Installation des dépendances système nécessaires
 RUN apt-get update && apt-get install -y \
     libfreetype6-dev \
     libjpeg62-turbo-dev \
@@ -9,36 +10,52 @@ RUN apt-get update && apt-get install -y \
     zip \
     unzip \
     git \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) gd pdo_mysql zip
+    libonig-dev \
+    libxml2-dev \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# # Active le module de réécriture d'Apache (indispensable pour les routes Laravel)
-# RUN a2enmod rewrite
+# 2. Configuration et installation des extensions PHP (y compris GD pour Excel/Word)
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j$(nproc) \
+    gd \
+    pdo_mysql \
+    zip \
+    mbstring \
+    exif \
+    pcntl \
+    bcmath \
+    xml
 
-# # Modifie la configuration d'Apache pour pointer directement vers le dossier "public"
-# ENV APACHE_DOCUMENT_ROOT /var/www/html/public
-# RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
-# RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
-# Désactiver les MPM conflictuels et s'assurer que prefork est actif
-RUN a2dismod mpm_event mpm_worker || true
-RUN a2enmod mpm_prefork
+# 3. SOLUTION AU CRASH APACHE : Suppression physique des MPM conflictuels
+# On force Apache à n'utiliser que 'prefork' pour PHP
+RUN rm -f /etc/apache2/mods-enabled/mpm_event.load /etc/apache2/mods-enabled/mpm_event.conf \
+    && rm -f /etc/apache2/mods-enabled/mpm_worker.load /etc/apache2/mods-enabled/mpm_worker.conf \
+    && a2enmod mpm_prefork \
+    && a2enmod rewrite
 
-# Active le module de réécriture d'Apache (indispensable pour les routes Laravel)
-RUN a2enmod rewrite
-# Définit le dossier de travail
+# 4. Configuration du dossier racine d'Apache pour pointer vers /public de Laravel
+ENV APACHE_DOCUMENT_ROOT /var/www/html/public
+RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
+RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
+
+# 5. Préparation de l'application
 WORKDIR /var/www/html
 
-# Récupère Composer
+# Récupération de Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Copie tout le code de ton API dans le conteneur
+# Copie de tout le code du projet
 COPY . /var/www/html/
 
-# Installe les dépendances PHP (y compris phpspreadsheet et phpword)
+# Installation des dépendances PHP (via composer.lock pour garantir la version 8.3)
 RUN composer install --no-dev --optimize-autoloader
 
-# Donne les droits d'écriture à Laravel pour les logs et le cache
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+# 6. Gestion des permissions (Crucial pour Laravel)
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Expose le port 80 pour Railway
+# Exposition du port par défaut
 EXPOSE 80
+
+# Commande de lancement
+CMD ["apache2-foreground"]
