@@ -9,9 +9,23 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class FinancialFeeController extends Controller
 {
-    public function index($type)
+    public function index(Request $request, $type)
     {
-        $fees = FinancialFee::where('type', $type)->orderBy('id', 'asc')->get();
+        $year = $request->query('year');
+        $query = FinancialFee::where('type', $type);
+
+        $query->when($year, function ($q) use ($year) {
+            return $q->where(function ($subQuery) use ($year) {
+                // البحث إما في تاريخ التنفيذ أو بداخل رقم السجل (مثل: 2022/14)
+                $subQuery->whereYear('execution_order_date', $year)
+                         ->orWhere('registry_number', 'LIKE', $year . '/%')
+                         ->orWhere('registry_number', 'LIKE', '%' . $year . '%');
+            });
+        });
+
+        // تم إضافة limit 1500 لتسريع العرض
+        $fees = $query->orderBy('id', 'desc')->take(1500)->get();
+
         return response()->json($fees);
     }
 
@@ -48,12 +62,13 @@ class FinancialFeeController extends Controller
     }
 
     // دالة الاستيراد من Excel
+    // دالة الاستيراد من Excel
     public function import(Request $request)
     {
         try {
             $request->validate([
                 'file' => 'required|mimes:xlsx,xls,csv',
-                'type' => 'required|in:complementary,legal_aid' // تحديد نوع التبويب
+                'type' => 'required|in:complementary,legal_aid'
             ]);
 
             $data = Excel::toArray(new class {}, $request->file('file'));
@@ -71,10 +86,16 @@ class FinancialFeeController extends Controller
 
             foreach ($headers as $index => $header) {
                 $h = trim((string) $header);
+
                 if (str_contains($h, 'رقم سجل')) $idxReg = $index;
                 if (str_contains($h, 'تاريخ الامر')) $idxDate = $index;
                 if (str_contains($h, 'رقم الامر')) $idxOrder = $index;
-                if (str_contains($h, 'الاسم الكامل') || str_contains($h, 'المدين')) $idxName = $index;
+
+                // 🔥 LE CORRECTIF EST ICI : On cherche le nom, mais on s'assure que ce n'est PAS l'adresse
+                if ((str_contains($h, 'الاسم') || str_contains($h, 'الإسم') || str_contains($h, 'المدين')) && !str_contains($h, 'عنوان')) {
+                    $idxName = $index;
+                }
+
                 if (str_contains($h, 'الرسوم القضائية')) $idxFees = $index;
                 if (str_contains($h, 'حقوق المرافعة')) $idxPlead = $index;
                 if (str_contains($h, 'عنوان')) $idxAddress = $index;
@@ -88,7 +109,22 @@ class FinancialFeeController extends Controller
                 $row = $rows[$i];
                 if (empty(array_filter($row))) continue;
 
-                // التعامل مع تواريخ Excel (إذا كانت أرقاماً أو نصوصاً)
+                // On récupère uniquement le nom pour faire la vérification
+                $debtorName = $idxName !== -1 ? trim((string)$row[$idxName]) : '';
+                $upperName = strtoupper($debtorName);
+
+                // 🔥 LE VRAI CORRECTIF EST ICI 🔥
+                // On vérifie SEULEMENT la colonne du nom.
+                // Si le nom est "المجموع العام" ou une formule Excel, on ignore la ligne !
+                if (str_contains($debtorName, 'المجموع') || str_starts_with($upperName, 'SUM') || str_starts_with($upperName, '=')) {
+                    continue;
+                }
+
+                // Sécurité supplémentaire : on ignore la ligne si le nom, le numéro de registre et l'ordre sont vides (ligne fantôme)
+                if (empty($debtorName) && empty($row[$idxReg]) && empty($row[$idxOrder])) {
+                    continue;
+                }
+
                 $dateVal = $idxDate !== -1 ? $row[$idxDate] : null;
                 if (is_numeric($dateVal)) {
                     $dateVal = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($dateVal)->format('Y-m-d');
@@ -99,7 +135,7 @@ class FinancialFeeController extends Controller
                     'registry_number' => $idxReg !== -1 ? trim((string)$row[$idxReg]) : null,
                     'execution_order_date' => $dateVal,
                     'execution_order_number' => $idxOrder !== -1 ? trim((string)$row[$idxOrder]) : null,
-                    'debtor_name' => trim((string)$row[$idxName]) ?: 'بدون اسم',
+                    'debtor_name' => $debtorName ?: 'بدون اسم',
                     'judicial_fees' => $idxFees !== -1 ? (float)$row[$idxFees] : 0,
                     'pleading_rights' => $idxPlead !== -1 ? (float)$row[$idxPlead] : 0,
                     'debtor_address' => $idxAddress !== -1 ? trim((string)$row[$idxAddress]) : null,
