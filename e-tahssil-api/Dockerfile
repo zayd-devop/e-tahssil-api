@@ -1,6 +1,5 @@
 # Utilise une image officielle PHP optimisée avec le serveur Apache
-FROM php:8.2-apache
-
+FROM php:8.3-apache
 # Installe les librairies système requises pour Laravel et GD
 RUN apt-get update && apt-get install -y \
     libfreetype6-dev \
