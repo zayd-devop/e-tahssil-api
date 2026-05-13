@@ -1,7 +1,7 @@
-# 1. Image de base
+# 1. Image de base officielle PHP 8.3 avec Apache
 FROM php:8.3-apache
 
-# 2. Dépendances système
+# 2. Installation des dépendances système (Librairies pour GD, Zip, Git, etc.)
 RUN apt-get update && apt-get install -y \
     libfreetype6-dev \
     libjpeg62-turbo-dev \
@@ -14,26 +14,42 @@ RUN apt-get update && apt-get install -y \
     libxml2-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 3. Extensions PHP
+# 3. Installation des extensions PHP indispensables pour Laravel
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) gd pdo_mysql zip mbstring exif pcntl bcmath xml
+    && docker-php-ext-install -j$(nproc) \
+    gd \
+    pdo_mysql \
+    zip \
+    mbstring \
+    exif \
+    pcntl \
+    bcmath \
+    xml
 
-# 4. Configuration Apache
+# 4. Configuration du dossier racine pour pointer vers le dossier "public" de Laravel
 ENV APACHE_DOCUMENT_ROOT /var/www/html/public
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
 RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
 
-# 5. Préparation de l'application
+# 5. Préparation du dossier de travail
 WORKDIR /var/www/html
+
+# 6. Installation de Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# 7. Copie de tout ton code source dans le conteneur
 COPY . /var/www/html/
+
+# 8. Installation des packages PHP (optimisé pour la production)
 RUN composer install --no-dev --optimize-autoloader
 
-# 6. Permissions
+# 9. Configuration des permissions cruciales pour Laravel
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# 7. LA SOLUTION FINALE : Le script de démarrage forcé
-# Au lieu de lancer Apache directement, on nettoie les MPM AVANT.
-EXPOSE 80
-CMD ["/bin/sh", "-c", "php artisan migrate --force && a2dismod mpm_event mpm_worker || true && a2enmod mpm_prefork rewrite && apache2-foreground"]
+# 10. LA COMMANDE DE LANCEMENT MAGIQUE (Exécutée au démarrage du serveur)
+# - Configure le port dynamique de Railway ($PORT)
+# - Désactive les MPM conflictuels et active les bons
+# - Exécute tes migrations de base de données
+# - Lance Apache
+CMD /bin/sh -c 'sed -i "s/80/${PORT:-80}/g" /etc/apache2/sites-available/000-default.conf /etc/apache2/ports.conf; a2dismod mpm_event mpm_worker || true; a2enmod mpm_prefork rewrite; php artisan migrate --force; apache2-foreground'
