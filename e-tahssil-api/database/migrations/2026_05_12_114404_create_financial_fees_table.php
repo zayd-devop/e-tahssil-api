@@ -16,6 +16,9 @@ return new class extends Migration
             $table->string('registry_number')->nullable(); // رقم سجل التصفية
             $table->date('execution_order_date')->nullable(); // تاريخ الأمر التنفيذي
             $table->string('execution_order_number')->nullable(); // رقم الأمر التنفيذي
+            $table->string('case_number')->nullable(); // رقم القضية
+            $table->date('judgement_date')->nullable(); // تاريخ الحكم
+            $table->string('judgement_number')->nullable(); // رقم الحكم
             $table->string('debtor_name'); // الإسم الكامل للمدين
             $table->decimal('judicial_fees', 10, 2)->default(0); // مبلغ الرسوم القضائية
             $table->decimal('pleading_rights', 10, 2)->default(0); // حقوق المرافعة

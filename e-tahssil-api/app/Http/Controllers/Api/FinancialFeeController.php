@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FinancialFee;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpWord\TemplateProcessor;
 
 class FinancialFeeController extends Controller
 {
@@ -24,7 +25,7 @@ class FinancialFeeController extends Controller
         });
 
         // تم إضافة limit 1500 لتسريع العرض
-        $fees = $query->orderBy('id', 'desc')->take(1500)->get();
+        $fees = $query->orderBy('id', 'asc')->get();
 
         return response()->json($fees);
     }
@@ -90,6 +91,10 @@ class FinancialFeeController extends Controller
                 if (str_contains($h, 'رقم سجل')) $idxReg = $index;
                 if (str_contains($h, 'تاريخ الامر')) $idxDate = $index;
                 if (str_contains($h, 'رقم الامر')) $idxOrder = $index;
+                if (str_contains($h, 'رقم القضية')) $idxCase = $index;
+                if (str_contains($h, 'تاريخ الحكم')) $idxJudgementDate = $index;
+                if (str_contains($h, 'رقم الحكم')) $idxJudgementNumber = $index;
+
 
                 // 🔥 LE CORRECTIF EST ICI : On cherche le nom, mais on s'assure que ce n'est PAS l'adresse
                 if ((str_contains($h, 'الاسم') || str_contains($h, 'الإسم') || str_contains($h, 'المدين')) && !str_contains($h, 'عنوان')) {
@@ -135,6 +140,10 @@ class FinancialFeeController extends Controller
                     'registry_number' => $idxReg !== -1 ? trim((string)$row[$idxReg]) : null,
                     'execution_order_date' => $dateVal,
                     'execution_order_number' => $idxOrder !== -1 ? trim((string)$row[$idxOrder]) : null,
+                    'case_number' => $idxCase !== -1 ? trim((string)$row[$idxCase]) : null,
+                    'judgement_date' => $idxJudgementDate !== -1 ? $row[$idxJudgementDate] : null,
+                    'judgement_number' => $idxJudgementNumber !== -1 ? trim((string)$row[$idxJudgementNumber]) : null,
+
                     'debtor_name' => $debtorName ?: 'بدون اسم',
                     'judicial_fees' => $idxFees !== -1 ? (float)$row[$idxFees] : 0,
                     'pleading_rights' => $idxPlead !== -1 ? (float)$row[$idxPlead] : 0,
@@ -148,4 +157,104 @@ class FinancialFeeController extends Controller
             return response()->json(['error' => 'حدث خطأ أثناء الاستيراد', 'details' => $e->getMessage()], 500);
         }
     }
+    public function downloadIndar($id)
+    {
+        try {
+            $fee = FinancialFee::findOrFail($id);
+
+            // 1. Charger le template
+            $templatePath = storage_path('app/templates/template_indar.docx');
+            $templateProcessor = new TemplateProcessor($templatePath);
+
+            // 2. Remplacer les variables dans le Word
+            $templateProcessor->setValue('registry_number', $fee->registry_number ?? '......');
+            $templateProcessor->setValue('debtor_name', $fee->debtor_name);
+            $templateProcessor->setValue('debtor_address', $fee->debtor_address ?? '................');
+            $templateProcessor->setValue('execution_order_number', $fee->execution_order_number ?? '......');
+            $templateProcessor->setValue('execution_order_date', $fee->execution_order_date ?? '......');
+            $templateProcessor->setValue('case_number', $fee->case_number ?? '......');
+            $templateProcessor->setValue('judgement_date', $fee->judgement_date ?? '......');
+            $templateProcessor->setValue('judgement_number', $fee->judgement_number ?? '......');
+            $templateProcessor->setValue('judicial_fees', number_format($fee->judicial_fees, 2));
+            $templateProcessor->setValue('pleading_rights', number_format($fee->pleading_rights, 2));
+            $templateProcessor->setValue('total_amount', number_format($fee->total_amount, 2));
+            $templateProcessor->setValue('current_date', date('Y-m-d'));
+
+            // Récupérer les infos du signataire (utilisateur connecté)
+            $user = auth()->user();
+            $signerName = ($user->prenom . ' ' . $user->nom) ?: '................';
+            $templateProcessor->setValue('signer_name', $signerName);
+            $templateProcessor->setValue('signer_role', $user->type_responsabilite ?? 'كاتب الضبط');
+
+            // 3. Sauvegarder dans un fichier temporaire
+            $fileName = "Indar_" . str_replace(' ', '_', $fee->debtor_name) . ".docx";
+            $tempPath = storage_path('app/public/' . $fileName);
+            $templateProcessor->saveAs($tempPath);
+
+            // 4. Retourner le fichier au navigateur
+            return response()->download($tempPath)->deleteFileAfterSend(true);
+
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+    public function bulkDownloadIndar(Request $request)
+{
+    try {
+        $request->validate(['ids' => 'required|array']);
+
+        $fees = FinancialFee::whereIn('id', $request->ids)->get();
+
+        if ($fees->isEmpty()) {
+            return response()->json(['error' => 'لا توجد بيانات'], 404);
+        }
+
+        // 1. تحميل القالب
+        $templatePath = storage_path('app/templates/template_indar.docx');
+        $templateProcessor = new \PhpOffice\PhpWord\TemplateProcessor($templatePath);
+
+        // 2. استنساخ الكتلة (RECORD) بعدد الملفات المحددة
+        // المعاملات: (اسم الكتلة, عدد النسخ, استبدال الكتلة الأصلية, إضافة فهرس للمتغيرات)
+        $templateProcessor->cloneBlock('RECORD', $fees->count(), true, true);
+
+        // جلب معلومات الموظف
+        $user = auth()->user();
+        $signerName = ($user->prenom . ' ' . $user->nom) ?: '................';
+        $signerRole = $user->type_responsabilite ?? 'كاتب الضبط';
+
+        // 3. ملء البيانات لكل نسخة (PHPWord سيضيف #1, #2 لكل متغير تلقائياً)
+        $i = 1;
+        foreach ($fees as $fee) {
+            $templateProcessor->setValue('registry_number#' . $i, $fee->registry_number ?? '......');
+            $templateProcessor->setValue('debtor_name#' . $i, $fee->debtor_name);
+            $templateProcessor->setValue('debtor_address#' . $i, $fee->debtor_address ?? '................');
+            $templateProcessor->setValue('execution_order_number#' . $i, $fee->execution_order_number ?? '......');
+            $templateProcessor->setValue('execution_order_date#' . $i, $fee->execution_order_date ?? '......');
+            $templateProcessor->setValue('case_number#' . $i, $fee->case_number ?? '......');
+            $templateProcessor->setValue('judgement_date#' . $i, $fee->judgement_date ?? '......');
+            $templateProcessor->setValue('judgement_number#' . $i, $fee->judgement_number ?? '......');
+            $templateProcessor->setValue('judicial_fees#' . $i, number_format($fee->judicial_fees, 2));
+            $templateProcessor->setValue('pleading_rights#' . $i, number_format($fee->pleading_rights, 2));
+            $templateProcessor->setValue('total_amount#' . $i, number_format($fee->total_amount, 2));
+            $templateProcessor->setValue('current_date#' . $i, date('Y-m-d'));
+
+            $templateProcessor->setValue('signer_name#' . $i, $signerName);
+            $templateProcessor->setValue('signer_role#' . $i, $signerRole);
+
+            $i++;
+        }
+
+        // 4. الحفظ والإرسال
+        $fileName = "Indarat_Groupes_" . date('Y-m-d') . ".docx";
+        $tempPath = storage_path('app/public/' . $fileName);
+        $templateProcessor->saveAs($tempPath);
+
+        return response()->download($tempPath)->deleteFileAfterSend(true);
+
+    } catch (\Exception $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+}
+
+
 }

@@ -86,5 +86,7 @@ Route::get('/folders', [DocumentController::class, 'getFolders']);
     Route::post('/financial-fees/bulk-delete', [FinancialFeeController::class, 'bulkDestroy']); // حذف مجمع
     Route::put('/financial-fees/{id}', [FinancialFeeController::class, 'update']);
     Route::delete('/financial-fees/{id}', [FinancialFeeController::class, 'destroy']);
+    Route::get('/financial-fees/download-indar/{id}', [FinancialFeeController::class, 'downloadIndar']);
+    Route::post('/financial-fees/bulk-download-indar', [FinancialFeeController::class, 'bulkDownloadIndar']);
 });
 
