@@ -134,9 +134,13 @@ public function importExcel(Request $request) {
     }
 
     // 3. Impression individuelle (Word)
+    // 3. Impression individuelle
     public function printSingle(Request $request, $id)
     {
         $minute = HearingMinute::where('user_id', $request->user()->id)->findOrFail($id);
+
+        // 🔥 1. Récupération du nom du greffier depuis l'URL (React envoie ?clerk_name=...)
+        $clerkName = $request->query('clerk_name', 'كاتب الضبط');
 
         try {
             $templatePath = storage_path('app/templates/PVAudience.docx');
@@ -150,6 +154,9 @@ public function importExcel(Request $request) {
             $templateProcessor->setValue('decision_content', $minute->decision_content);
             $templateProcessor->setValue('plaintiff', $minute->plaintiff ?? '-');
             $templateProcessor->setValue('defendant', $minute->defendant ?? '-');
+
+            // 🔥 2. Injection du nom du greffier dans le Word
+            $templateProcessor->setValue('clerk_name', $clerkName);
 
             $fileName = "PV_" . str_replace('/', '-', $minute->file_number) . ".docx";
             $tempFile = tempnam(sys_get_temp_dir(), 'PHPWord');
@@ -166,6 +173,10 @@ public function importExcel(Request $request) {
     public function printMerged(Request $request)
     {
         $ids = $request->input('ids');
+
+        // 🔥 1. Récupération du nom du greffier depuis le Body (JSON)
+        $clerkName = $request->input('clerk_name', 'كاتب الضبط');
+
         if (empty($ids)) return response()->json(['message' => 'لم يتم اختيار أي ملف'], 400);
 
         $minutes = HearingMinute::where('user_id', $request->user()->id)->whereIn('id', $ids)->get();
@@ -184,6 +195,9 @@ public function importExcel(Request $request) {
             $templateProcessor->setValue("decision_content#$i", $minute->decision_content);
             $templateProcessor->setValue("plaintiff#$i", $minute->plaintiff ?? '-');
             $templateProcessor->setValue("defendant#$i", $minute->defendant ?? '-');
+
+            // 🔥 2. Injection du nom du greffier pour chaque copie générée
+            $templateProcessor->setValue("clerk_name#$i", $clerkName);
         }
 
         $fileName = "Publipostage_PV_" . date('Y-m-d') . ".docx";
