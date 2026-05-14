@@ -166,13 +166,30 @@ class FinancialFeeController extends Controller
             $templatePath = storage_path('app/templates/template_indar.docx');
             $templateProcessor = new TemplateProcessor($templatePath);
 
+            // 🔥 LOGIQUE DE FORMATAGE : Numéro / Année
+            $formattedOrderNumber = $fee->execution_order_number ?? '......';
+            if (!empty($fee->execution_order_number) && !empty($fee->execution_order_date)) {
+                $year = date('Y', strtotime($fee->execution_order_date));
+                $formattedOrderNumber = $fee->execution_order_number . '/' . $year;
+            }
+
+            // 🔥 LOGIQUE DE FORMATAGE : Nettoyage du numéro de dossier (رقم القضية)
+            // On supprime toutes les lettres (arabes/françaises) et espaces, on garde juste chiffres et '/'
+            $cleanCaseNumber = '......';
+            if (!empty($fee->case_number)) {
+                $cleanCaseNumber = preg_replace('/[^0-9\/]/', '', $fee->case_number);
+            }
+
             // 2. Remplacer les variables dans le Word
             $templateProcessor->setValue('registry_number', $fee->registry_number ?? '......');
             $templateProcessor->setValue('debtor_name', $fee->debtor_name);
             $templateProcessor->setValue('debtor_address', $fee->debtor_address ?? '................');
-            $templateProcessor->setValue('execution_order_number', $fee->execution_order_number ?? '......');
+            $templateProcessor->setValue('execution_order_number', $formattedOrderNumber);
             $templateProcessor->setValue('execution_order_date', $fee->execution_order_date ?? '......');
-            $templateProcessor->setValue('case_number', $fee->case_number ?? '......');
+
+            // On utilise la nouvelle variable nettoyée ici 👇
+            $templateProcessor->setValue('case_number', $cleanCaseNumber);
+
             $templateProcessor->setValue('judgement_date', $fee->judgement_date ?? '......');
             $templateProcessor->setValue('judgement_number', $fee->judgement_number ?? '......');
             $templateProcessor->setValue('judicial_fees', number_format($fee->judicial_fees, 2));
@@ -198,63 +215,80 @@ class FinancialFeeController extends Controller
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
+
     public function bulkDownloadIndar(Request $request)
-{
-    try {
-        $request->validate(['ids' => 'required|array']);
+    {
+        try {
+            $request->validate(['ids' => 'required|array']);
 
-        $fees = FinancialFee::whereIn('id', $request->ids)->get();
+            $fees = FinancialFee::whereIn('id', $request->ids)->get();
 
-        if ($fees->isEmpty()) {
-            return response()->json(['error' => 'لا توجد بيانات'], 404);
+            if ($fees->isEmpty()) {
+                return response()->json(['error' => 'لا توجد بيانات'], 404);
+            }
+
+            // 1. تحميل القالب
+            $templatePath = storage_path('app/templates/template_indar.docx');
+            $templateProcessor = new \PhpOffice\PhpWord\TemplateProcessor($templatePath);
+
+            // 2. استنساخ الكتلة (RECORD) بعدد الملفات المحددة
+            $templateProcessor->cloneBlock('RECORD', $fees->count(), true, true);
+
+            // جلب معلومات الموظف
+            $user = auth()->user();
+            $signerName = ($user->prenom . ' ' . $user->nom) ?: '................';
+            $signerRole = $user->type_responsabilite ?? 'كاتب الضبط';
+
+            // 3. ملء البيانات لكل نسخة
+            $i = 1;
+            foreach ($fees as $fee) {
+
+                // 🔥 LOGIQUE DE FORMATAGE : Numéro / Année pour l'impression de masse
+                $formattedOrderNumber = $fee->execution_order_number ?? '......';
+                if (!empty($fee->execution_order_number) && !empty($fee->execution_order_date)) {
+                    $year = date('Y', strtotime($fee->execution_order_date));
+                    $formattedOrderNumber = $fee->execution_order_number . '/' . $year;
+                }
+
+                // 🔥 LOGIQUE DE FORMATAGE : Nettoyage du numéro de dossier (رقم القضية)
+                $cleanCaseNumber = '......';
+                if (!empty($fee->case_number)) {
+                    $cleanCaseNumber = preg_replace('/[^0-9\/]/', '', $fee->case_number);
+                }
+
+                $templateProcessor->setValue('registry_number#' . $i, $fee->registry_number ?? '......');
+                $templateProcessor->setValue('debtor_name#' . $i, $fee->debtor_name);
+                $templateProcessor->setValue('debtor_address#' . $i, $fee->debtor_address ?? '................');
+                $templateProcessor->setValue('execution_order_number#' . $i, $formattedOrderNumber);
+                $templateProcessor->setValue('execution_order_date#' . $i, $fee->execution_order_date ?? '......');
+
+                // On utilise la nouvelle variable nettoyée ici 👇
+                $templateProcessor->setValue('case_number#' . $i, $cleanCaseNumber);
+
+                $templateProcessor->setValue('judgement_date#' . $i, $fee->judgement_date ?? '......');
+                $templateProcessor->setValue('judgement_number#' . $i, $fee->judgement_number ?? '......');
+                $templateProcessor->setValue('judicial_fees#' . $i, number_format($fee->judicial_fees, 2));
+                $templateProcessor->setValue('pleading_rights#' . $i, number_format($fee->pleading_rights, 2));
+                $templateProcessor->setValue('total_amount#' . $i, number_format($fee->total_amount, 2));
+                $templateProcessor->setValue('current_date#' . $i, date('Y-m-d'));
+
+                $templateProcessor->setValue('signer_name#' . $i, $signerName);
+                $templateProcessor->setValue('signer_role#' . $i, $signerRole);
+
+                $i++;
+            }
+
+            // 4. الحفظ والإرسال
+            $fileName = "Indarat_Groupes_" . date('Y-m-d') . ".docx";
+            $tempPath = storage_path('app/public/' . $fileName);
+            $templateProcessor->saveAs($tempPath);
+
+            return response()->download($tempPath)->deleteFileAfterSend(true);
+
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
         }
-
-        // 1. تحميل القالب
-        $templatePath = storage_path('app/templates/template_indar.docx');
-        $templateProcessor = new \PhpOffice\PhpWord\TemplateProcessor($templatePath);
-
-        // 2. استنساخ الكتلة (RECORD) بعدد الملفات المحددة
-        // المعاملات: (اسم الكتلة, عدد النسخ, استبدال الكتلة الأصلية, إضافة فهرس للمتغيرات)
-        $templateProcessor->cloneBlock('RECORD', $fees->count(), true, true);
-
-        // جلب معلومات الموظف
-        $user = auth()->user();
-        $signerName = ($user->prenom . ' ' . $user->nom) ?: '................';
-        $signerRole = $user->type_responsabilite ?? 'كاتب الضبط';
-
-        // 3. ملء البيانات لكل نسخة (PHPWord سيضيف #1, #2 لكل متغير تلقائياً)
-        $i = 1;
-        foreach ($fees as $fee) {
-            $templateProcessor->setValue('registry_number#' . $i, $fee->registry_number ?? '......');
-            $templateProcessor->setValue('debtor_name#' . $i, $fee->debtor_name);
-            $templateProcessor->setValue('debtor_address#' . $i, $fee->debtor_address ?? '................');
-            $templateProcessor->setValue('execution_order_number#' . $i, $fee->execution_order_number ?? '......');
-            $templateProcessor->setValue('execution_order_date#' . $i, $fee->execution_order_date ?? '......');
-            $templateProcessor->setValue('case_number#' . $i, $fee->case_number ?? '......');
-            $templateProcessor->setValue('judgement_date#' . $i, $fee->judgement_date ?? '......');
-            $templateProcessor->setValue('judgement_number#' . $i, $fee->judgement_number ?? '......');
-            $templateProcessor->setValue('judicial_fees#' . $i, number_format($fee->judicial_fees, 2));
-            $templateProcessor->setValue('pleading_rights#' . $i, number_format($fee->pleading_rights, 2));
-            $templateProcessor->setValue('total_amount#' . $i, number_format($fee->total_amount, 2));
-            $templateProcessor->setValue('current_date#' . $i, date('Y-m-d'));
-
-            $templateProcessor->setValue('signer_name#' . $i, $signerName);
-            $templateProcessor->setValue('signer_role#' . $i, $signerRole);
-
-            $i++;
-        }
-
-        // 4. الحفظ والإرسال
-        $fileName = "Indarat_Groupes_" . date('Y-m-d') . ".docx";
-        $tempPath = storage_path('app/public/' . $fileName);
-        $templateProcessor->saveAs($tempPath);
-
-        return response()->download($tempPath)->deleteFileAfterSend(true);
-
-    } catch (\Exception $e) {
-        return response()->json(['error' => $e->getMessage()], 500);
     }
-}
 
 
 }

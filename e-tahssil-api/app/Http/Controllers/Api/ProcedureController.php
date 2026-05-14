@@ -38,67 +38,10 @@ class ProcedureController extends Controller
     return response()->json(['message' => 'Modifié avec succès']);
 }
 
-//    public function import(Request $request)
-//     {
-//         try {
-//             $request->validate([
-//                 'file' => 'required|mimes:xlsx,xls,csv'
-//             ]);
 
-//             $data = Excel::toArray(new class {}, $request->file('file'));
-
-//             if (empty($data) || empty($data[0])) {
-//                 return response()->json(['error' => 'الملف فارغ أو لا يمكن قراءته'], 400);
-//             }
-
-//             $rows = $data[0];
-//             $headers = $rows[0]; // Les en-têtes bruts
-
-//             // Variables pour stocker les index
-//             $idxFile = false; $idxAddress = false; $idxDecision = false;
-//             $idxJudgment = false; $idxParty = false; $idxRole = false; $idxPronouncement = false;
-
-//             // RECHERCHE INTELLIGENTE : On cherche juste une partie du mot pour ignorer les espaces/BOM invisibles
-//             foreach ($headers as $index => $header) {
-//                 $headerStr = (string) $header; // Forcer en chaîne de caractères
-
-//                 if (str_contains($headerStr, 'الملف')) $idxFile = $index;
-//                 if (str_contains($headerStr, 'الحكم')) $idxJudgment = $index;
-//                 if (str_contains($headerStr, 'العنوان')) $idxAddress = $index;
-//                 if (str_contains($headerStr, 'المقرر')) $idxDecision = $index;
-//                 if (str_contains($headerStr, 'الصفة')) $idxRole = $index;
-//                 if (str_contains($headerStr, 'الطرف')) $idxParty = $index;
-//             }
-
-//             // Sauvegarde dans la base de données
-//             for ($i = 1; $i < count($rows); $i++) {
-//                 $row = $rows[$i];
-
-//                 // On vérifie que la ligne n'est pas complètement vide
-//                 if (array_filter($row)) {
-//                     Procedure::create([
-//                         // Utilise exactement les noms de ta base de données (fileNumber, judgmentNumber)
-//                         'fileNumber' => $idxFile !== false ? $row[$idxFile] : null,
-//                         'judgmentNumber' => $idxJudgment !== false ? $row[$idxJudgment] : null,
-//                         'address' => $idxAddress !== false ? $row[$idxAddress] : null,
-//                         'decision' => $idxDecision !== false ? $row[$idxDecision] : null,
-//                         'role' => $idxRole !== false ? $row[$idxRole] : null,
-//                         'parties' => $idxParty !== false && $row[$idxParty] ? explode("\n", str_replace([',', '-'], "\n", $row[$idxParty])) : [],
-//                     ]);
-//                 }
-//             }
-
-//             return response()->json(['message' => 'تم استيراد البيانات بنجاح']);
-
-//         } catch (\Exception $e) {
-//             return response()->json([
-//                 'error' => 'حدث خطأ في الخادم',
-//                 'details' => $e->getMessage()
-//             ], 500);
-//         }
-//     }
 public function import(Request $request)
     {
+        set_time_limit(300);
         try {
             $request->validate(['file' => 'required|mimes:xlsx,xls,csv']);
 
