@@ -165,6 +165,8 @@ public function import(Request $request)
     }
     public function print($id) {
         $procedure = Procedure::findOrFail($id);
+        $procedure->user_id = auth()->id();
+        $procedure->save();
         return response()->json($procedure);
     }
 }

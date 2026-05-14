@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\FinancialFeeController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -68,6 +69,7 @@ Route::get('/folders', [DocumentController::class, 'getFolders']);
     Route::put('/procedures/{id}', [ProcedureController::class, 'update']);
     Route::post('/procedures/import', [ProcedureController::class, 'import']);
     Route::get('/procedures/{id}/print', [ProcedureController::class, 'print']);
+    Route::post('/procedures/print/{id}', [ProcedureController::class, 'print']);
 
     // --- Routes pour les Documents  توليد الوثائق ---
     Route::post('/generate-document', [DocumentController::class, 'generate']);
@@ -88,5 +90,8 @@ Route::get('/folders', [DocumentController::class, 'getFolders']);
     Route::delete('/financial-fees/{id}', [FinancialFeeController::class, 'destroy']);
     Route::get('/financial-fees/download-indar/{id}', [FinancialFeeController::class, 'downloadIndar']);
     Route::post('/financial-fees/bulk-download-indar', [FinancialFeeController::class, 'bulkDownloadIndar']);
+
+    // Nouvelle route pour le dashboard
+    Route::get('/dashboard-stats', [DashboardController::class, 'getStats']);
 });
 
