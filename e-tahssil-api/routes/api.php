@@ -94,5 +94,11 @@ Route::get('/folders', [DocumentController::class, 'getFolders']);
     // Nouvelle route pour le dashboard
     Route::get('/dashboard-stats', [DashboardController::class, 'getStats']);
     Route::get('/dashboard/export', [DashboardController::class, 'exportReport']);
+
+    // Routes pour محاضر الجلسات
+    Route::get('/hearing-minutes', [HearingMinuteController::class, 'index']);
+    Route::post('/hearing-minutes/import', [HearingMinuteController::class, 'importExcel']);
+    Route::get('/hearing-minutes/print/{id}', [HearingMinuteController::class, 'printSingle']);
+    Route::post('/hearing-minutes/print-merged', [HearingMinuteController::class, 'printMerged']);
 });
 
