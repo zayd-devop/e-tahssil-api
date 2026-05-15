@@ -93,5 +93,6 @@ Route::get('/folders', [DocumentController::class, 'getFolders']);
 
     // Nouvelle route pour le dashboard
     Route::get('/dashboard-stats', [DashboardController::class, 'getStats']);
+    Route::get('/dashboard/export', [DashboardController::class, 'exportReport']);
 });
 
